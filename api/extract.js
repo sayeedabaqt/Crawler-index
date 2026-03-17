@@ -1,5 +1,4 @@
-// Vercel serverless proxy — calls EC2 API server-side (no CORS/SSL issues)
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
     if (req.method === 'OPTIONS') {
         res.status(200).end();
         return;
@@ -24,4 +23,4 @@ export default async function handler(req, res) {
     } catch (err) {
         res.status(500).json({ status: 'error', data: { error: `EC2 connection failed: ${err.message}` } });
     }
-}
+};

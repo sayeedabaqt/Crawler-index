@@ -1,4 +1,4 @@
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
     const EC2_API = 'http://65.2.181.66:8000';
 
     try {
@@ -8,4 +8,4 @@ export default async function handler(req, res) {
     } catch (err) {
         res.status(500).json({ status: 'error', error: `EC2 connection failed: ${err.message}` });
     }
-}
+};
