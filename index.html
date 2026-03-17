@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Company Data Extractor</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
+
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+
+        h1 { font-size: 2rem; font-weight: 700; text-align: center; margin-bottom: 8px; color: #f8fafc; }
+        .subtitle { text-align: center; color: #94a3b8; margin-bottom: 40px; font-size: 0.95rem; }
+
+        .input-group { display: flex; gap: 12px; margin-bottom: 30px; }
+        .input-group input { flex: 1; padding: 14px 18px; border: 1px solid #334155; border-radius: 10px; background: #1e293b; color: #f1f5f9; font-size: 1rem; outline: none; transition: border-color 0.2s; }
+        .input-group input:focus { border-color: #3b82f6; }
+        .input-group input::placeholder { color: #64748b; }
+
+        .btn { padding: 14px 28px; border: none; border-radius: 10px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+        .btn-primary { background: #3b82f6; color: white; }
+        .btn-primary:hover { background: #2563eb; }
+        .btn-primary:disabled { background: #475569; cursor: not-allowed; }
+
+        .status-bar { text-align: center; padding: 16px; margin-bottom: 24px; border-radius: 10px; font-size: 0.9rem; display: none; }
+        .status-bar.loading { display: block; background: #1e3a5f; color: #93c5fd; }
+        .status-bar.error { display: block; background: #3b1219; color: #fca5a5; }
+        .status-bar.success { display: block; background: #14532d; color: #86efac; }
+
+        .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid #93c5fd; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; margin-right: 8px; vertical-align: middle; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .results { display: none; }
+        .results.show { display: block; }
+
+        .meta { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 24px; }
+        .meta-item { background: #1e293b; padding: 12px 18px; border-radius: 8px; border: 1px solid #334155; }
+        .meta-label { font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; }
+        .meta-value { font-size: 1.1rem; font-weight: 600; color: #f1f5f9; margin-top: 4px; }
+
+        .sections-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 24px; }
+        .section-tag { padding: 6px 14px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; }
+        .section-tag.found { background: #14532d; color: #86efac; }
+        .section-tag.missing { background: #3b1219; color: #fca5a5; }
+
+        .section-card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; margin-bottom: 16px; overflow: hidden; }
+        .section-header { padding: 16px 20px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+        .section-header:hover { background: #253347; }
+        .section-title { font-size: 1.1rem; font-weight: 600; color: #f1f5f9; text-transform: capitalize; }
+        .section-arrow { color: #94a3b8; transition: transform 0.2s; }
+        .section-arrow.open { transform: rotate(180deg); }
+        .section-body { padding: 0 20px 20px; display: none; }
+        .section-body.open { display: block; }
+
+        .data-row { display: flex; padding: 8px 0; border-bottom: 1px solid #334155; }
+        .data-row:last-child { border-bottom: none; }
+        .data-key { width: 140px; flex-shrink: 0; color: #94a3b8; font-size: 0.85rem; font-weight: 500; }
+        .data-value { color: #e2e8f0; font-size: 0.9rem; word-break: break-word; }
+
+        .person-card, .product-card { background: #0f172a; border-radius: 8px; padding: 12px 16px; margin-bottom: 8px; }
+        .person-name, .product-name { font-weight: 600; color: #f1f5f9; }
+        .person-role, .product-desc { font-size: 0.85rem; color: #94a3b8; margin-top: 4px; }
+
+        .json-toggle { text-align: center; margin-top: 24px; }
+        .json-toggle a { color: #3b82f6; cursor: pointer; font-size: 0.85rem; }
+        .json-raw { display: none; margin-top: 16px; background: #0f172a; border: 1px solid #334155; border-radius: 10px; padding: 20px; overflow-x: auto; }
+        .json-raw.show { display: block; }
+        .json-raw pre { color: #94a3b8; font-size: 0.8rem; white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Company Data Extractor</h1>
+        <p class="subtitle">Enter a company website to extract contact, people, products, financials, and more.</p>
+
+        <div class="input-group">
+            <input type="text" id="websiteInput" placeholder="e.g. firstbankchicago.com" />
+            <input type="text" id="nameInput" placeholder="Company name (optional)" style="max-width: 220px;" />
+            <button class="btn btn-primary" id="extractBtn" onclick="extract()">Extract</button>
+        </div>
+
+        <div class="status-bar" id="statusBar"></div>
+
+        <div class="results" id="results">
+            <div class="meta" id="meta"></div>
+            <div class="sections-bar" id="sectionsBar"></div>
+            <div id="sectionCards"></div>
+            <div class="json-toggle">
+                <a onclick="toggleJson()">Show raw JSON</a>
+            </div>
+            <div class="json-raw" id="jsonRaw"><pre id="jsonPre"></pre></div>
+        </div>
+    </div>
+
+    <script>
+        // Uses Vercel serverless proxy — no CORS/SSL issues
+        const API_URL = '/api';
+
+        async function extract() {
+            const website = document.getElementById('websiteInput').value.trim();
+            const name = document.getElementById('nameInput').value.trim();
+            if (!website) return alert('Enter a website URL');
+
+            const btn = document.getElementById('extractBtn');
+            const statusBar = document.getElementById('statusBar');
+            const results = document.getElementById('results');
+
+            btn.disabled = true;
+            btn.textContent = 'Extracting...';
+            results.classList.remove('show');
+            statusBar.className = 'status-bar loading';
+            statusBar.innerHTML = '<span class="spinner"></span> Extracting data... this takes 2-3 minutes.';
+
+            try {
+                const body = { website };
+                if (name) body.company_name = name;
+
+                const res = await fetch(`${API_URL}/extract`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
+                });
+
+                const data = await res.json();
+
+                if (data.status === 'error') {
+                    statusBar.className = 'status-bar error';
+                    statusBar.textContent = `Error: ${data.data?.error || 'Unknown error'}`;
+                    return;
+                }
+
+                statusBar.className = 'status-bar success';
+                statusBar.textContent = `Extracted in ${data.duration_seconds}s | ${data.sections_found.length} sections found`;
+
+                renderResults(data);
+                results.classList.add('show');
+
+            } catch (err) {
+                statusBar.className = 'status-bar error';
+                statusBar.textContent = `Connection error: ${err.message}`;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Extract';
+            }
+        }
+
+        function renderResults(data) {
+            const meta = document.getElementById('meta');
+            const d = data.data || {};
+            const maint = d.maintenance_info || {};
+            meta.innerHTML = `
+                <div class="meta-item"><div class="meta-label">Company</div><div class="meta-value">${data.company_name}</div></div>
+                <div class="meta-item"><div class="meta-label">Website</div><div class="meta-value">${data.website}</div></div>
+                <div class="meta-item"><div class="meta-label">Duration</div><div class="meta-value">${data.duration_seconds}s</div></div>
+                <div class="meta-item"><div class="meta-label">Last Wayback Capture</div><div class="meta-value">${maint.last_capture ? maint.last_capture.split('T')[0] : '—'}</div></div>
+                <div class="meta-item"><div class="meta-label">Updates (Wayback)</div><div class="meta-value">${maint.update_count != null ? maint.update_count : '—'}</div></div>
+            `;
+
+            const bar = document.getElementById('sectionsBar');
+            bar.innerHTML = '';
+            (data.sections_found || []).forEach(s => {
+                bar.innerHTML += `<span class="section-tag found">${s}</span>`;
+            });
+            (data.sections_missing || []).forEach(s => {
+                bar.innerHTML += `<span class="section-tag missing">${s}</span>`;
+            });
+
+            const cards = document.getElementById('sectionCards');
+            cards.innerHTML = '';
+            const extracted = d.extracted_data || d;
+
+            const sectionOrder = ['about', 'contact', 'people', 'products', 'financials', 'partners', 'shareholders'];
+
+            sectionOrder.forEach(section => {
+                const sectionData = extracted?.[section]?.extracted || extracted?.[section];
+                if (!sectionData || typeof sectionData !== 'object') return;
+
+                const card = document.createElement('div');
+                card.className = 'section-card';
+                card.innerHTML = `
+                    <div class="section-header" onclick="toggleSection(this)">
+                        <span class="section-title">${section}</span>
+                        <span class="section-arrow">&#9660;</span>
+                    </div>
+                    <div class="section-body">${renderSection(section, sectionData)}</div>
+                `;
+                cards.appendChild(card);
+            });
+
+            const firstHeader = cards.querySelector('.section-header');
+            if (firstHeader) toggleSection(firstHeader);
+
+            document.getElementById('jsonPre').textContent = JSON.stringify(d, null, 2);
+        }
+
+        function renderSection(section, data) {
+            if (!data || typeof data !== 'object') return `<div class="data-value">${data || 'No data'}</div>`;
+
+            if (section === 'people') return renderPeople(data);
+            if (section === 'products') return renderProducts(data);
+
+            let html = '';
+            const skipKeys = ['extraction_method', 'confidence_level', 'title', 'char_count', 'word_count', 'size_kb'];
+            for (const [key, value] of Object.entries(data)) {
+                if (skipKeys.includes(key)) continue;
+                if (key.endsWith('_original')) continue;
+                const display = Array.isArray(value) ? value.join(', ') : (typeof value === 'object' ? JSON.stringify(value) : value);
+                const label = key.replace(/_/g, ' ');
+                html += `<div class="data-row"><div class="data-key">${label}</div><div class="data-value">${display || '—'}</div></div>`;
+            }
+            return html;
+        }
+
+        function renderPeople(data) {
+            const people = data.executives || data.people || (Array.isArray(data) ? data : []);
+            if (!people.length) return '<div class="data-value">No people found</div>';
+            return people.map(p => `
+                <div class="person-card">
+                    <div class="person-name">${p.name || '—'}</div>
+                    <div class="person-role">${p.title || p.role || '—'}</div>
+                    ${p.description ? `<div class="person-role">${p.description}</div>` : ''}
+                </div>
+            `).join('');
+        }
+
+        function renderProducts(data) {
+            const items = data.products || data.services || data.items || (Array.isArray(data) ? data : []);
+            const desc = data.description;
+            let html = '';
+            if (desc) html += `<div class="data-row"><div class="data-key">Description</div><div class="data-value">${desc}</div></div>`;
+            if (items.length) {
+                html += items.map(p => `
+                    <div class="product-card">
+                        <div class="product-name">${typeof p === 'string' ? p : (p.name || '—')}</div>
+                        ${p.name_original ? `<div class="product-desc">Original: ${p.name_original}</div>` : ''}
+                        ${p.description ? `<div class="product-desc">${p.description}</div>` : ''}
+                    </div>
+                `).join('');
+            } else {
+                html += '<div class="data-value">No products found</div>';
+            }
+            return html;
+        }
+
+        function toggleSection(header) {
+            const body = header.nextElementSibling;
+            const arrow = header.querySelector('.section-arrow');
+            body.classList.toggle('open');
+            arrow.classList.toggle('open');
+        }
+
+        function toggleJson() {
+            document.getElementById('jsonRaw').classList.toggle('show');
+        }
+
+        document.getElementById('websiteInput').addEventListener('keypress', e => {
+            if (e.key === 'Enter') extract();
+        });
+    </script>
+</body>
+</html>
